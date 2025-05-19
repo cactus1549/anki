@@ -1,0 +1,7 @@
+Deck: ATPL::061 GNAV::Formulas::Great Circle, Front: What is the formula for conversion angle?, Error: cannot create note because it is a duplicate
+Deck: ATPL::061 GNAV::Formulas::Grid Navigation, Front: What is grivation?, Error: cannot create note because it is a duplicate
+Deck: ATPL::061 GNAV::Formulas::Speed, Front: What is the formula for Local Speed of Sound (LSS)?, Error: cannot create note because it is a duplicate
+Deck: ATPL::061 GNAV::Formulas::Navigation, Front: What is the formula for Point of Equal Time (PET)?, Error: cannot create note because it is a duplicate
+Deck: ATPL::061 GNAV::Formulas::Instrumentation, Front: What is the formula for turn radius?, Error: cannot create note because it is a duplicate
+Deck: ATPL::061 GNAV::Basics of Navigation::Speed::Mach Number (M), Front: What is the formula for Mach number?, Error: cannot create note because it is a duplicate
+Deck: ATPL::061 GNAV::Basics of Navigation::Speed::Mach Number (M), Front: What is the formula for Local Speed of Sound (LSS)?, Error: cannot create note because it is a duplicate

@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Backup and log files
+*.log
+*.bak
+*.swp
+*.tmp
+anki_import_log.txt
+
+# Jupyter Notebooks (optional, if used for prototyping)
+.ipynb_checkpoints
+
+# VS Code settings (optional)
+.vscode/
+
+# macOS metadata
+.DS_Store
+
+# Python virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Cache
+*.egg-info/
+*.egg
+dist/
+build/
+.cache/

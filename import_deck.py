@@ -5,6 +5,7 @@ from tkinter import Tk
 from tkinter.filedialog import askopenfilename
 from collections import Counter
 import os
+import re
 
 anki_connect = 'http://localhost:8765'
 default_csv_root = 'P:/@SYNC/@_ATPL/@SUMMARIES'
@@ -13,22 +14,47 @@ required_headers = {'Deck', 'Front', 'Back', 'Ref', 'Tags'}
 log_file_path = "anki_import_log.txt"
 
 def anki_model_exists(model_name="Basic"):
-    response = requests.post(anki_connect, json={
-        'action': 'modelNames',
-        'version': 6
-    })
+    response = requests.post(anki_connect, json={'action': 'modelNames', 'version': 6})
     return model_name in response.json().get('result', [])
 
 def create_deck(deck_name):
-    response = requests.post(anki_connect, json={
-        'action': 'createDeck',
-        'version': 6,
-        'params': {'deck': deck_name}
-    })
-    return response.json()
+    requests.post(anki_connect, json={'action': 'createDeck', 'version': 6, 'params': {'deck': deck_name}})
 
 def detect_model(front_text):
     return "Cloze" if "{{c" in front_text else "Basic"
+
+def get_all_existing_fronts_by_model(model):
+    field_name = "Front" if model == "Basic" else "Text"
+    response = requests.post(anki_connect, json={
+        'action': 'findNotes',
+        'version': 6,
+        'params': {'query': f'{field_name}:*'}
+    })
+    note_ids = response.json().get('result', [])
+    if not note_ids:
+        return {}
+
+    fetch_resp = requests.post(anki_connect, json={
+        'action': 'notesInfo',
+        'version': 6,
+        'params': {'notes': note_ids}
+    })
+    notes_info = fetch_resp.json().get('result', [])
+    existing = {}
+    for note in notes_info:
+        note_model = note['modelName']
+        front_field = note['fields'].get("Front" if note_model == "Basic" else "Text", {}).get('value', '')
+        back_field = note['fields'].get("Back" if note_model == "Basic" else "Back Extra", {}).get('value', '')
+        note_id = note.get('noteId', 0)
+        existing[front_field.strip()] = {'back': back_field.strip(), 'id': note_id}
+    return existing
+
+def delete_note(note_id):
+    requests.post(anki_connect, json={
+        'action': 'deleteNotes',
+        'version': 6,
+        'params': {'notes': [note_id]}
+    })
 
 def add_note(deck, front, back, ref, tags, model):
     fields = {
@@ -46,7 +72,7 @@ def add_note(deck, front, back, ref, tags, model):
                 'modelName': model,
                 'fields': fields,
                 'tags': tags,
-                'options': {'allowDuplicate': False}
+                'options': {'allowDuplicate': True}
             }
         }
     })
@@ -94,24 +120,66 @@ def import_from_rows(rows, base_deck=None, dry_run=False):
     if os.path.exists(log_file_path):
         os.remove(log_file_path)
 
-    print(f"Processing {len(rows)} cards...")
+    model_cache = {"Basic": get_all_existing_fronts_by_model("Basic"),
+                   "Cloze": get_all_existing_fronts_by_model("Cloze")}
+
+    allow_all = False
+    disallow_all = False
+    replace_all = False
+
+    print(f"\nProcessing {len(rows)} cards...")
 
     for idx, col in enumerate(rows, start=1):
         try:
-            deck = col['Deck']
+            deck = col['Deck'].strip()
             if base_deck:
                 deck = f"{base_deck}::{deck}"
-            front = col['Front']
-            back = col['Back']
-            ref = col['Ref']
+            front = col['Front'].strip()
+            back = col['Back'].strip()
+            ref = col['Ref'].strip()
             tags = col['Tags'].split()
             model = detect_model(front)
 
+            create_deck(deck)
+
+            existing = model_cache[model].get(front)
+            if existing:
+                if existing['back'] == back:
+                    print(f"🔁 Skipped duplicate (Card {idx}): Exact match of Front+Back: {front[:40]}...")
+                    continue
+
+                if dry_run and not (allow_all or disallow_all or replace_all):
+                    print(f"⚠️ Duplicate found (Card {idx}):")
+                    print(f"  Front: {front}")
+                    print(f"  Existing Back: {existing['back']}")
+                    print(f"  Proposed Back: {back}")
+                    choice = input("Action? [y]es / [n]o / [r]eplace / [a]llow all / [d]isallow all / replace [A]ll: ").strip().lower()
+                    if choice == 'n':
+                        continue
+                    elif choice == 'd':
+                        disallow_all = True
+                        continue
+                    elif choice == 'a':
+                        allow_all = True
+                    elif choice == 'r':
+                        pass  # replace only this one
+                    elif choice == 'y':
+                        pass  # allow this one
+                    elif choice == 'A':
+                        replace_all = True
+                    else:
+                        print("Skipping by default.")
+                        continue
+                elif disallow_all:
+                    continue
+
+                if not dry_run and (replace_all or choice == 'r'):
+                    delete_note(existing['id'])
+
             if dry_run:
-                print(f"✔️ Dry run {idx}/{len(rows)}: Would add {model} card to '{deck}'")
+                print(f"✔️ [{idx}/{len(rows)}] Add: '{front[:40]}' → '{back[:40]}' to {deck}")
                 continue
 
-            create_deck(deck)
             result = add_note(deck, front, back, ref, tags, model)
             status = "OK" if result.get('error') is None else result.get('error')
             print(f"{'✔️' if status == 'OK' else '❌'} Card {idx}/{len(rows)}: {front[:50]}... -> {status}")
@@ -159,6 +227,6 @@ if __name__ == '__main__':
             import_from_rows(rows, base_deck, dry_run=False)
 
         if os.path.exists(log_file_path):
-            print(f"\n❗ Some cards failed to import. See '{log_file_path}' for details.")
+            print(f"\n⚠️ Some cards were skipped or failed. See '{log_file_path}' for details.")
     else:
         print("No file selected.")

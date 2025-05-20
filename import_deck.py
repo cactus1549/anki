@@ -149,6 +149,46 @@ def summarize_deck(rows):
     for tag, count in tags_counter.items():
         print(f"  #{tag} — {count} cards")
 
+def get_single_key(prompt: str, valid_keys: str) -> str:
+    """
+    Get a single key press from user without requiring Enter.
+    Args:
+        prompt: Message to display to user
+        valid_keys: String containing acceptable characters (case-insensitive)
+    Returns:
+        Lowercase version of the pressed key
+    """
+    import sys
+    import tty
+    import termios
+    
+    while True:
+        print(prompt)
+        try:
+            # Set terminal to raw mode
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            try:
+                tty.setraw(sys.stdin.fileno())
+                key = sys.stdin.read(1).lower()
+            finally:
+                # Restore terminal settings
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            
+            if key == 'q':
+                raise KeyboardInterrupt("User cancelled operation")
+                
+            if key in valid_keys.lower():
+                return key
+                
+            print(f"Invalid key. Please press one of: {valid_keys} or q to quit")
+            
+        except KeyboardInterrupt:
+            print("\nOperation cancelled by user")
+            raise
+        except Exception as e:
+            print(f"\nInput error: {e}")
+            raise
 
 def import_from_rows(rows, base_deck=None, dry_run=False, cache_path=None):
     if os.path.exists(log_file_path):
@@ -209,24 +249,34 @@ def import_from_rows(rows, base_deck=None, dry_run=False, cache_path=None):
                 print(f"  Front: {front}")
                 print(f"  Existing Back: {existing['back']}")
                 print(f"  Proposed Back: {back}")
-                choice = input("Add? [y]es / [n]o / [r]eplace / [Y]es to all / [N]o to all, / [R]eplace all: ").strip()
-                if choice == 'n':  # No (lowercase)
+                
+                try:
+                    choice = get_single_key(
+                        prompt="Add? [y]es, [n]o, [r]eplace, [Y]es to all, [N]o to all, [R]eplace to all",
+                        valid_keys="ynrYNR"
+                    )
+                    if choice == 'n':  # No (lowercase)
+                        continue
+                    elif choice == 'y':  # Yes (lowercase)
+                        pass  # proceed normally
+                    elif choice == 'r':  # Replace (lowercase)
+                        replace_id = existing['id']
+                    elif choice == 'Y':  # Yes to all (uppercase)
+                        allow_all = True
+                    elif choice == 'N':  # No to all (uppercase)
+                        disallow_all = True
+                        continue
+                    elif choice == 'R':  # Replace to all (uppercase)
+                        replace_all = True
+                        replace_id = existing['id']
+
+                except KeyboardInterrupt:
+                    print("\nImport cancelled by user")
+                    return
+                except Exception as e:
+                    print(f"Error getting user input: {e}, skipping card")
                     continue
-                elif choice == 'y':  # Yes (lowercase)
-                    pass  # proceed normally
-                elif choice == 'r':  # Replace (lowercase)
-                    replace_id = existing['id']
-                elif choice == 'Y':  # Yes to all (uppercase)
-                    allow_all = True
-                elif choice == 'N':  # No to all (uppercase)
-                    disallow_all = True
-                    continue
-                elif choice == 'R':  # Replace to all (uppercase)
-                    replace_all = True
-                    replace_id = existing['id']
-                else:  # Default action if invalid input
-                    print("Invalid choice, skipping by default.")
-                    continue
+        
             elif disallow_all and existing:
                 continue
             elif replace_all and existing:

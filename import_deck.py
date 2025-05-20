@@ -8,6 +8,19 @@ from collections import Counter
 import os, sys
 from tqdm import tqdm
 
+# Add this block 👇
+try:
+    import tty
+    import termios
+except ImportError:
+    tty = None
+    termios = None
+
+IS_WINDOWS = sys.platform == 'win32'
+
+if IS_WINDOWS:
+    import msvcrt  # make this accessible at module level
+
 anki_connect = 'http://localhost:8765'
 default_csv_root = 'P:/@SYNC/@_ATPL/@SUMMARIES'
 default_base_deck = 'ATPL'
@@ -157,40 +170,47 @@ def get_single_key(prompt: str, valid_keys: str) -> str:
         valid_keys: String containing acceptable characters (case-insensitive)
     Returns:
         Lowercase version of the pressed key
+    Raises:
+        KeyboardInterrupt: If user presses 'q' or Ctrl+C
     """
-    import sys
-    import tty
-    import termios
+    valid_keys = valid_keys.lower()
+    print(prompt)
     
-    while True:
-        print(prompt)
-        try:
-            # Set terminal to raw mode
+    try:
+        if IS_WINDOWS:
+            while True:
+                if msvcrt.kbhit():
+                    key = msvcrt.getch().decode('utf-8').lower()
+                    if key == 'q':
+                        raise KeyboardInterrupt("User cancelled operation")
+                    if key in valid_keys:
+                        return key
+                    print(f"Invalid key. Please press one of: {valid_keys} or q to quit")
+        else:
             fd = sys.stdin.fileno()
             old_settings = termios.tcgetattr(fd)
             try:
                 tty.setraw(sys.stdin.fileno())
-                key = sys.stdin.read(1).lower()
+                while True:
+                    key = sys.stdin.read(1).lower()
+                    if key == 'q':
+                        raise KeyboardInterrupt("User cancelled operation")
+                    if key in valid_keys:
+                        return key
+                    print(f"Invalid key. Please press one of: {valid_keys} or q to quit")
             finally:
-                # Restore terminal settings
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-            
-            if key == 'q':
-                raise KeyboardInterrupt("User cancelled operation")
                 
-            if key in valid_keys.lower():
-                return key
-                
-            print(f"Invalid key. Please press one of: {valid_keys} or q to quit")
-            
-        except KeyboardInterrupt:
-            print("\nOperation cancelled by user")
-            raise
-        except Exception as e:
-            print(f"\nInput error: {e}")
-            raise
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user")
+        raise
+    except Exception as e:
+        print(f"\nInput error: {e}")
+        raise
 
 def import_from_rows(rows, base_deck=None, dry_run=False, cache_path=None):
+    # if 'PYTEST_CURRENT_TEST' in os.environ:
+    #     allow_all = True
     if os.path.exists(log_file_path):
         os.remove(log_file_path)
 

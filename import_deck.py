@@ -209,21 +209,23 @@ def import_from_rows(rows, base_deck=None, dry_run=False, cache_path=None):
                 print(f"  Front: {front}")
                 print(f"  Existing Back: {existing['back']}")
                 print(f"  Proposed Back: {back}")
-                choice = input("Action? [y]es / [n]o / [r]eplace / [a]llow all / [d]isallow all / replace [A]ll: ").strip().lower()
-                if choice == 'n':
+                choice = input("Add? [y]es / [n]o / [r]eplace / [Y]es to all / [N]o to all, / [R]eplace all: ").strip()
+                if choice == 'n':  # No (lowercase)
                     continue
-                elif choice == 'd':
+                elif choice == 'y':  # Yes (lowercase)
+                    pass  # proceed normally
+                elif choice == 'r':  # Replace (lowercase)
+                    replace_id = existing['id']
+                elif choice == 'Y':  # Yes to all (uppercase)
+                    allow_all = True
+                elif choice == 'N':  # No to all (uppercase)
                     disallow_all = True
                     continue
-                elif choice == 'a':
-                    allow_all = True
-                elif choice == 'r':
-                    replace_id = existing['id']
-                elif choice == 'A':
+                elif choice == 'R':  # Replace to all (uppercase)
                     replace_all = True
                     replace_id = existing['id']
-                elif choice != 'y':
-                    print("Skipping by default.")
+                else:  # Default action if invalid input
+                    print("Invalid choice, skipping by default.")
                     continue
             elif disallow_all and existing:
                 continue

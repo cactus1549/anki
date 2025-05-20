@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
-import import_deck
+import utils 
 
 @pytest.fixture
 def sample_rows():
@@ -54,7 +54,7 @@ def mock_requests(monkeypatch):
 def test_import_new_cards(sample_rows, mock_requests, mock_anki_responses):
     mock_post, _ = mock_requests
     mock_post.side_effect = mock_anki_responses()
-    import_deck.import_from_rows(sample_rows, base_deck="Test", dry_run=False)
+    utils.import_from_rows(sample_rows, base_deck="Test", dry_run=False)
 
     add_note_calls = [c[1]["json"]["action"] for c in mock_post.call_args_list]
     assert add_note_calls.count("addNote") == len(sample_rows)
@@ -66,13 +66,13 @@ def test_import_skip_duplicates(sample_rows, mock_requests, mock_anki_responses)
         duplicate_back="Answer 1"
     )
 
-    import_deck.import_from_rows(sample_rows[:1], base_deck="Test", dry_run=False)
+    utils.import_from_rows(sample_rows[:1], base_deck="Test", dry_run=False)
     actions = [c[1]["json"]["action"] for c in mock_post.call_args_list]
     assert "addNote" not in actions
 
 def test_import_dry_run(sample_rows, mock_requests, mock_anki_responses):
     mock_post, _ = mock_requests
     mock_post.side_effect = mock_anki_responses()
-    import_deck.import_from_rows(sample_rows, base_deck="Test", dry_run=True)
+    utils.import_from_rows(sample_rows, base_deck="Test", dry_run=True)
     actions = [c[1]["json"]["action"] for c in mock_post.call_args_list]
     assert "addNote" not in actions

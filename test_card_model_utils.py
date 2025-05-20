@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-import import_deck
+import utils 
 
 @pytest.fixture
 def mock_requests(monkeypatch):
@@ -12,8 +12,8 @@ def mock_requests(monkeypatch):
 
 
 def test_detect_model():
-    assert import_deck.detect_model("Normal question") == "Basic"
-    assert import_deck.detect_model("{{c1::Cloze}} question") == "Cloze"
+    assert utils.detect_model("Normal question") == "Basic"
+    assert utils.detect_model("{{c1::Cloze}} question") == "Cloze"
 
 def test_get_all_existing_fronts_by_model(mock_requests):
     mock_post, _ = mock_requests
@@ -45,7 +45,7 @@ def test_get_all_existing_fronts_by_model(mock_requests):
 
     mock_post.side_effect = [find_mock, info_mock]
 
-    result = import_deck.get_all_existing_fronts_by_model("Basic")
+    result = utils.get_all_existing_fronts_by_model("Basic")
     assert len(result) == 2
     assert "Question 1" in result
     assert result["Question 1"]["back"] == "Answer 1"

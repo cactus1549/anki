@@ -67,6 +67,17 @@ def anki_model_exists(model_name=CardModel.BASIC):
     except Exception:
         return False
 
+def safe_input(prompt: str, default: str = '') -> str:
+    """Input that returns lowercase trimmed response, or default if blank. Handles Ctrl+C."""
+    try:
+        value = input(prompt).strip().lower()
+        return value or default
+    except (EOFError, KeyboardInterrupt):
+        print("\n❌ Operation cancelled by user.")
+        raise
+
+
+
 def check_ankiconnect():
     try:
         response = requests.get(ANKI_CONNECT_URL, timeout=2)

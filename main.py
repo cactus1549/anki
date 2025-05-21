@@ -1,6 +1,8 @@
 import argparse
 import json
 import os
+import sys
+from pathlib import Path
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
 
@@ -10,22 +12,25 @@ from utils import (
     suggest_base_deck,
     anki_model_exists,
     import_from_rows,
-    LOG_FILE_PATH
+    LOG_FILE_PATH,
+    safe_input
 )
 
 DEFAULT_CSV_ROOT = 'P:/@SYNC/@_ATPL/@SUMMARIES'
 DEFAULT_BASE_DECK = 'ATPL'
 
+def get_cache_path(csv_path: str) -> str:
+    return f"{os.path.splitext(csv_path)[0]}_approved.json"
+
 def main(args):
     def process_file(path):
-        cache_file = f"{os.path.splitext(path)[0]}_approved.json"
+        cache_file = get_cache_path(path)
         use_cache = None
 
         if os.path.exists(cache_file) and not args.use_cache:
             try:
-                use_cache = input(f"\nFound previously approved cards in '{cache_file}'. Use these? [Y/n] ").strip().lower()
+                use_cache = safe_input(f"\nFound previously approved cards in '{cache_file}'. Use these? [Y/n] ", default='y')
             except KeyboardInterrupt:
-                print("\n❌ Operation cancelled by user.")
                 return
         if use_cache != 'n':
             args.use_cache = cache_file
@@ -53,7 +58,6 @@ def main(args):
         try:
             base_deck = suggest_base_deck(rows, args.base_deck, args.headless)
         except KeyboardInterrupt:
-            print("\n❌ Operation cancelled by user.")
             return
 
         if not anki_model_exists("Basic") or not anki_model_exists("Cloze"):
@@ -63,10 +67,9 @@ def main(args):
         dry_run = args.dry_run
         if not args.headless and not dry_run:
             try:
-                dry_run_choice = input("Would you like to do a dry run (Y/n)? ").strip().lower()
+                dry_run_choice = safe_input("Would you like to do a dry run (Y/n)?", default='y')
                 dry_run = dry_run_choice != 'n'
             except KeyboardInterrupt:
-                print("\n❌ Operation cancelled by user.")
                 return
 
         print("\nStarting import...")
@@ -80,7 +83,7 @@ def main(args):
 
             if not args.headless:
                 try:
-                    save_cache = input("\nSave these approved cards for future imports? (Y/n): ").strip().lower()
+                    save_cache = safe_input("\nSave these approved cards for future imports? (Y/n):", default='y')
                     if save_cache != 'n':
                         print(f"✅ Approved cards saved to: {cache_file}")
                     else:
@@ -89,13 +92,12 @@ def main(args):
                         except FileNotFoundError:
                             pass
 
-                    proceed = input("\nDry run complete. Proceed with actual import? (y/n): ").strip().lower()
+                    proceed = safe_input("\nDry run complete. Proceed with actual import? (y/n):", default='n')
                     if proceed == 'y':
                         import_from_rows(rows, base_deck, dry_run=False)
                     else:
                         print("Import cancelled.")
                 except KeyboardInterrupt:
-                    print("\n❌ Operation cancelled by user.")
                     return
         else:
             import_from_rows(rows, base_deck, dry_run=False)
@@ -132,7 +134,12 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Import decks from CSV into Anki via AnkiConnect.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        epilog="""
+Example usage:
+  python main.py --file questions.csv --dry-run
+  python main.py --folder ./exports --base-deck MyDeck
+        """
     )
     parser.add_argument("--file", help="Import a single CSV file")
     parser.add_argument("--folder", help="Import all CSV files in a folder")
